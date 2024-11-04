@@ -2,8 +2,9 @@
 use crate::{
     config::MAX_SYSCALL_NUM,
     task::{
-        change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, TaskStatus,
+        change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, TaskStatus, get_starting_time, get_syscall_times
     },
+    timer::{get_time_us, get_time_ms},
 };
 
 #[repr(C)]
@@ -50,7 +51,7 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
         };
     }
     trace!("kernel: sys_get_time");
-    -1
+    0
 }
 
 /// YOUR JOB: Finish sys_task_info to pass testcases
@@ -68,7 +69,7 @@ pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
             time: get_time_ms() - get_starting_time(),
         };
     }
-    -1
+    0
 }
 
 // YOUR JOB: Implement mmap.
