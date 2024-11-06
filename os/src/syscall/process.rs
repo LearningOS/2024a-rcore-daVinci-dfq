@@ -42,6 +42,13 @@ pub fn sys_yield() -> isize {
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
 pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
+    let us = get_time_us();
+    unsafe {
+        *ts = TimeVal {
+            sec: us / 1_000_000,
+            usec: us % 1_000_000,
+        };
+    }
     trace!("kernel: sys_get_time");
     -1
 }
@@ -51,6 +58,16 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
 /// HINT: What if [`TaskInfo`] is splitted by two pages ?
 pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
     trace!("kernel: sys_task_info NOT IMPLEMENTED YET!");
+    if _ti.is_null() {
+        return -1
+    }
+    unsafe {
+        *_ti = TaskInfo {
+            status: TaskStatus::Running,
+            syscall_times: get_syscall_times(),
+            time: get_time_ms() - get_starting_time(),
+        };
+    }
     -1
 }
 
