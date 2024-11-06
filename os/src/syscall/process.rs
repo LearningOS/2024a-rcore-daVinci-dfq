@@ -45,7 +45,7 @@ pub fn sys_yield() -> isize {
 pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
     let us = get_time_us();
     unsafe {
-        *ts = TimeVal {
+        *_ts = TimeVal {
             sec: us / 1_000_000,
             usec: us % 1_000_000,
         };
