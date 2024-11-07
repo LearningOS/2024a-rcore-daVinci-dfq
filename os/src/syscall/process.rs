@@ -5,6 +5,8 @@ use crate::{
         change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, TaskStatus, get_starting_time, get_syscall_times
     },
     timer::{get_time_us, get_time_ms},
+    mm::translated_byte_buffer,
+    task::current_user_token,
 };
 
 #[repr(C)]
@@ -44,14 +46,16 @@ pub fn sys_yield() -> isize {
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
 pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
     trace!("kernel: sys_get_time");
-    let buffer = translated_byte_buffer(current_user_token(), )
     let us = get_time_us();
-    unsafe {
-        *_ts = TimeVal {
-            sec: us / 1_000_000,
-            usec: us % 1_000_000,
-        };
-    }
+    let tv = TimeVal {
+        sec: us / 1_000_000,
+        usec: us % 1_000_000,
+    };
+    let buffers = translated_byte_buffer(
+        current_user_token(),
+        ts as *const u8,
+        core::mem::size_of::<TimeVal>()
+    );
     0
 }
 
@@ -60,16 +64,16 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
 /// HINT: What if [`TaskInfo`] is splitted by two pages ?
 pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
     trace!("kernel: sys_task_info NOT IMPLEMENTED YET!");
-    if _ti.is_null() {
-        return -1
-    }
-    unsafe {
-        *_ti = TaskInfo {
-            status: TaskStatus::Running,
-            syscall_times: get_syscall_times(),
-            time: get_time_ms() - get_starting_time(),
-        };
-    }
+    let task_info = TaskInfo {
+        status: TaskStatus::Running,
+        syscall_times: get_syscall_times(),
+        time: get_time_ms() - get_starting_time(),
+    };
+    let buffers = translated_byte_buffer(
+        current_user_token(),
+        ti as *const u8,
+        core::mem::size_of::<TaskInfo>()
+    );
     0
 }
 
