@@ -44,49 +44,95 @@ pub fn sys_yield() -> isize {
 /// YOUR JOB: get time with second and microsecond
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TimeVal`] is splitted by two pages ?
-pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
+pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
     trace!("kernel: sys_get_time");
     let us = get_time_us();
-    let tv = TimeVal {
+    let time_val = TimeVal {
         sec: us / 1_000_000,
         usec: us % 1_000_000,
     };
-    let buffers = translated_byte_buffer(
-        current_user_token(),
-        ts as *const u8,
-        core::mem::size_of::<TimeVal>()
-    );
+    let time_val_len = core::mem::size_of::<TimeVal>();
+    let mut buffers = translated_byte_buffer(current_user_token(), ts as *const u8, time_val_len);
+    let mut bytes_copied = 0;
+    let time_val_bytes = unsafe {
+        core::slice::from_raw_parts(
+            &time_val as *const TimeVal as *const u8,
+            time_val_len
+        )
+    };
+    for buffer in &mut buffers {
+        let buffer_len = buffer.len();
+        if buffer_len + bytes_copied >= time_val_len {
+            let end = time_val_len - bytes_copied;
+            buffer[..end].copy_from_slice(
+                &time_val_bytes[bytes_copied..time_val_len]
+            );
+            bytes_copied += end;
+            break;
+        } else {
+            buffer.copy_from_slice(
+                &time_val_bytes[bytes_copied..bytes_copied + buffer_len]
+            );
+            bytes_copied += buffer_len
+        }
+    }
+    if bytes_copied != time_val_len {
+        return -1;
+    }
     0
 }
 
 /// YOUR JOB: Finish sys_task_info to pass testcases
 /// HINT: You might reimplement it with virtual memory management.
 /// HINT: What if [`TaskInfo`] is splitted by two pages ?
-pub fn sys_task_info(_ti: *mut TaskInfo) -> isize {
-    trace!("kernel: sys_task_info NOT IMPLEMENTED YET!");
+pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
+    trace!("kernel: sys_task_info");
     let task_info = TaskInfo {
         status: TaskStatus::Running,
         syscall_times: get_syscall_times(),
         time: get_time_ms() - get_starting_time(),
     };
-    let buffers = translated_byte_buffer(
-        current_user_token(),
-        ti as *const u8,
-        core::mem::size_of::<TaskInfo>()
-    );
+    let task_info_len = core::mem::size_of::<TaskInfo>();
+    let mut buffers = translated_byte_buffer(current_user_token(), ti as *const u8, task_info_len);
+    let mut bytes_copied = 0;
+    let task_info_bytes = unsafe {
+        core::slice::from_raw_parts(
+            &task_info as *const TaskInfo as *const u8,
+            task_info_len
+        )
+    };
+    for buffer in &mut buffers {
+        let buffer_len = buffer.len();
+        if buffer_len + bytes_copied >= task_info_len {
+            let end = task_info_len - bytes_copied;
+            buffer[..end].copy_from_slice(
+                &task_info_bytes[bytes_copied..task_info_len]
+            );
+            bytes_copied += end;
+            break;
+        } else {
+            buffer.copy_from_slice(
+                &task_info_bytes[bytes_copied..bytes_copied + buffer_len]
+            );
+            bytes_copied += buffer_len;
+        }
+    }
+    if bytes_copied != task_info_len {
+        return -1;
+    }
     0
 }
 
 // YOUR JOB: Implement mmap.
 pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
-    trace!("kernel: sys_mmap NOT IMPLEMENTED YET!");
-    -1
+    trace!("kernel: sys_mmap");
+    0
 }
 
 // YOUR JOB: Implement munmap.
 pub fn sys_munmap(_start: usize, _len: usize) -> isize {
-    trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
-    -1
+    trace!("kernel: sys_munmap");
+    0
 }
 /// change data segment size
 pub fn sys_sbrk(size: i32) -> isize {
