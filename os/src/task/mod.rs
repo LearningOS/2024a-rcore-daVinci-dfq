@@ -24,7 +24,7 @@ mod task;
 use crate::loader::get_app_data_by_name;
 use alloc::sync::Arc;
 use lazy_static::*;
-pub use manager::{fetch_task, TaskManager};
+pub use manager::{fetch_task, TaskManager, TASK_MANAGER};
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
 
@@ -35,6 +35,8 @@ pub use processor::{
     current_task, current_trap_cx, current_user_token, run_tasks, schedule, take_current_task,
     Processor,
 };
+pub use crate::mm::{ VirtAddr, MapPermission };
+
 /// Suspend the current 'Running' task and run the next task in task list.
 pub fn suspend_current_and_run_next() {
     // There must be an application running.

@@ -75,6 +75,19 @@ impl MemorySet {
     /// Add a new MapArea into this MemorySet.
     /// Assuming that there are no conflicts in the virtual address
     /// space.
+
+    /// Remove the framed area.
+    pub fn remove_framed_area(
+        &mut self,
+        start_va: VirtAddr,
+        end_va: VirtAddr,
+    ) {
+        for area in &mut self.areas {
+            if area.vpn_range.get_start() == start_va.floor() && area.vpn_range.get_end() == end_va.ceil() {
+                area.unmap(&mut self.page_table)
+            }
+        }
+    }
     fn push(&mut self, mut map_area: MapArea, data: Option<&[u8]>) {
         map_area.map(&mut self.page_table);
         if let Some(data) = data {
@@ -299,6 +312,44 @@ impl MemorySet {
         } else {
             false
         }
+    }
+
+    /// map
+    pub fn mmap(&mut self, start: VirtAddr, end: VirtAddr, perm: MapPermission) -> isize {
+        let mut vpn: VirtPageNum = start.into();
+        let end_vpn = end.ceil();
+        loop {
+            if let Some(pte) = self.translate(vpn) {
+                if pte.is_valid() {
+                    return -1;
+                }
+            }
+            vpn.0 += 1;
+            if vpn == end_vpn {
+                break;
+            }
+        }
+        self.insert_framed_area(start, end, perm | MapPermission::U);
+        0
+    }
+
+    /// munmap
+    pub fn munmap(&mut self, start: VirtAddr, end: VirtAddr) -> isize {
+        let mut vpn: VirtPageNum = start.into();
+        let end_vpn = end.ceil();
+        loop {
+            if let Some(pte) = self.translate(vpn) {
+                if !pte.is_valid() {
+                    return -1;
+                }
+            }
+            vpn.0 += 1;
+            if vpn == end_vpn {
+                break;
+            }
+        }
+        self.remove_framed_area(start, end);
+        0
     }
 }
 /// map area structure, controls a contiguous piece of virtual memory

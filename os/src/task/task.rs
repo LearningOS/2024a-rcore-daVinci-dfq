@@ -1,13 +1,14 @@
 //! Types related to task management & Functions for completely changing TCB
 use super::TaskContext;
-use super::{kstack_alloc, pid_alloc, KernelStack, PidHandle};
-use crate::config::TRAP_CONTEXT_BASE;
-use crate::mm::{MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE};
+use super::{ kstack_alloc, pid_alloc, KernelStack, PidHandle };
+use crate::config::{ TRAP_CONTEXT_BASE, MAX_SYSCALL_NUM };
+use crate::mm::{ MemorySet, PhysPageNum, VirtAddr, KERNEL_SPACE };
 use crate::sync::UPSafeCell;
-use crate::trap::{trap_handler, TrapContext};
-use alloc::sync::{Arc, Weak};
+use crate::trap::{ trap_handler, TrapContext };
+use alloc::sync::{ Arc, Weak };
 use alloc::vec::Vec;
 use core::cell::RefMut;
+use crate::timer::get_time_ms;
 
 /// Task control block structure
 ///
@@ -50,6 +51,12 @@ pub struct TaskControlBlockInner {
     /// Maintain the execution status of the current process
     pub task_status: TaskStatus,
 
+    /// Counter for sys_call
+    pub syscall_times: [u32; MAX_SYSCALL_NUM],
+
+    /// The task starting time
+    pub starting_time: usize,
+
     /// Application address space
     pub memory_set: MemorySet,
 
@@ -68,6 +75,8 @@ pub struct TaskControlBlockInner {
 
     /// Program break
     pub program_brk: usize,
+
+    pub priority: isize,
 }
 
 impl TaskControlBlockInner {
@@ -79,7 +88,8 @@ impl TaskControlBlockInner {
     pub fn get_user_token(&self) -> usize {
         self.memory_set.token()
     }
-    fn get_status(&self) -> TaskStatus {
+    /// get status
+    pub fn get_status(&self) -> TaskStatus {
         self.task_status
     }
     pub fn is_zombie(&self) -> bool {
@@ -118,6 +128,10 @@ impl TaskControlBlock {
                     exit_code: 0,
                     heap_bottom: user_sp,
                     program_brk: user_sp,
+                    starting_time: get_time_ms(),
+                    syscall_times: [0; MAX_SYSCALL_NUM],
+                    priority: 1,
+
                 })
             },
         };
@@ -191,6 +205,9 @@ impl TaskControlBlock {
                     exit_code: 0,
                     heap_bottom: parent_inner.heap_bottom,
                     program_brk: parent_inner.program_brk,
+                    starting_time: get_time_ms(),
+                    syscall_times: [0; MAX_SYSCALL_NUM],
+                    priority: 1,
                 })
             },
         });
