@@ -1,11 +1,18 @@
 //! Process management syscalls
 use crate::{
-    config::MAX_SYSCALL_NUM,
+    config::{
+        MAX_SYSCALL_NUM,
+        PAGE_SIZE
+    },
     task::{
-        change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, TaskStatus, get_starting_time, get_syscall_times
+        change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, TaskStatus, get_starting_time, get_syscall_times, mmap, munmap
     },
     timer::{get_time_us, get_time_ms},
-    mm::translated_byte_buffer,
+    mm::{
+        translated_byte_buffer,
+        MapPermission,
+        VirtAddr,
+    },
     task::current_user_token,
 };
 
@@ -123,16 +130,57 @@ pub fn sys_task_info(ti: *mut TaskInfo) -> isize {
     0
 }
 
+bitflags! {
+    pub struct Port: usize {
+        ///Readable
+        const R = 1 << 0;
+        ///Writable
+        const W = 1 << 1;
+        ///Excutable
+        const X = 1 << 2;
+    }
+}
+
+impl From<Port> for MapPermission {
+    fn from(port: Port) -> Self {
+        let mut map_perm = MapPermission::empty();
+        if port.contains(Port::R) {
+            map_perm |= MapPermission::R;
+        }
+        if port.contains(Port::W) {
+            map_perm |= MapPermission::W;
+        }
+        if port.contains(Port::X) {
+            map_perm |= MapPermission::X;
+        }
+        map_perm
+    }
+}
+
 // YOUR JOB: Implement mmap.
-pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
+pub fn sys_mmap(start: usize, len: usize, port: usize) -> isize {
     trace!("kernel: sys_mmap");
-    0
+    if (port & !0x7 != 0) || (port & 0x7 == 0) {
+        return -1;
+    }
+    if start % PAGE_SIZE != 0 {
+        return -1;
+    }
+    let start_addr: VirtAddr = start.into();
+    let end_addr: VirtAddr = (start + len).into();
+    let port = Port::from_bits(port).unwrap();
+    mmap(start_addr, end_addr, port.into())
 }
 
 // YOUR JOB: Implement munmap.
-pub fn sys_munmap(_start: usize, _len: usize) -> isize {
+pub fn sys_munmap(start: usize, len: usize) -> isize {
     trace!("kernel: sys_munmap");
-    0
+    if start % PAGE_SIZE != 0 {
+        return -1;
+    }
+    let start_addr: VirtAddr = start.into();
+    let end_addr: VirtAddr = (start + len).into();
+    munmap(start_addr, end_addr)
 }
 /// change data segment size
 pub fn sys_sbrk(size: i32) -> isize {

@@ -26,6 +26,11 @@ pub use task::{TaskControlBlock, TaskStatus};
 pub use context::TaskContext;
 
 use crate::timer::get_time_ms;
+use crate::mm::{
+    VirtPageNum,
+    VirtAddr,
+    MapPermission,
+};
 
 /// The task manager, where all the tasks are managed.
 ///
@@ -182,6 +187,48 @@ impl TaskManager {
         let ret = inner.tasks[current].syscall_times;
         ret
     }
+
+    fn mmap(&self, start: VirtAddr, end: VirtAddr, perm: MapPermission) -> isize {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let memory_set = &mut inner.tasks[current].memory_set;
+        let mut vpn: VirtPageNum = start.into();
+        let end_vpn = end.ceil();
+        loop {
+            if let Some(pte) = memory_set.translate(vpn) {
+                if pte.is_valid() {
+                    return -1;
+                }
+            }
+            vpn.0 += 1;
+            if vpn == end_vpn {
+                break;
+            }
+        }
+        memory_set.insert_framed_area(start, end, perm | MapPermission::U);
+        0
+    }
+
+    fn munmap(&self, start: VirtAddr, end: VirtAddr) -> isize {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let memory_set = &mut inner.tasks[current].memory_set;
+        let mut vpn: VirtPageNum = start.into();
+        let end_vpn = end.ceil();
+        loop {
+            if let Some(pte) = memory_set.translate(vpn) {
+                if !pte.is_valid() {
+                    return -1;
+                }
+            }
+            vpn.0 += 1;
+            if vpn == end_vpn {
+                break;
+            }
+        }
+        memory_set.remove_framed_area(start, end);
+        0
+    }
 }
 
 /// Run the first task in task list.
@@ -246,4 +293,14 @@ pub fn upgrade_syscall_times(syscall_id: usize) {
 /// Get the times of syscall.
 pub fn get_syscall_times() -> [u32; MAX_SYSCALL_NUM] {
     TASK_MANAGER.get_syscall_times()
+}
+
+/// mmap.
+pub fn mmap(start: VirtAddr, end: VirtAddr, perm: MapPermission) -> isize {
+    TASK_MANAGER.mmap(start, end, perm)
+}
+
+/// munmap
+pub fn munmap(start: VirtAddr, end: VirtAddr) -> isize {
+    TASK_MANAGER.munmap(start, end)
 }
