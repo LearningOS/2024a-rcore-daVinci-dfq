@@ -4,6 +4,9 @@ use crate::sync::UPSafeCell;
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 use lazy_static::*;
+
+// const BIG_SRIDE: isize = 1024;
+
 ///A array of `TaskControlBlock` that is thread-safe
 pub struct TaskManager {
     ready_queue: VecDeque<Arc<TaskControlBlock>>,
@@ -19,6 +22,9 @@ impl TaskManager {
     }
     /// Add process back to ready queue
     pub fn add(&mut self, task: Arc<TaskControlBlock>) {
+        // let mut inner = task.inner_exclusive_access();
+        // let pass = inner.pass + BIG_SRIDE / inner.priority;
+        // inner.pass = pass;
         self.ready_queue.push_back(task);
     }
     /// Take a process out of the ready queue
