@@ -77,6 +77,8 @@ pub struct TaskControlBlockInner {
     pub program_brk: usize,
 
     pub priority: isize,
+
+    pub pass: isize,
 }
 
 impl TaskControlBlockInner {
@@ -131,7 +133,7 @@ impl TaskControlBlock {
                     starting_time: get_time_ms(),
                     syscall_times: [0; MAX_SYSCALL_NUM],
                     priority: 1,
-
+                    pass: 0,
                 })
             },
         };
@@ -208,6 +210,7 @@ impl TaskControlBlock {
                     starting_time: get_time_ms(),
                     syscall_times: [0; MAX_SYSCALL_NUM],
                     priority: 1,
+                    pass: 0,
                 })
             },
         });
