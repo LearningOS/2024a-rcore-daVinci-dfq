@@ -76,12 +76,30 @@ pub fn sys_close(fd: usize) -> isize {
 }
 
 /// YOUR JOB: Implement fstat.
-pub fn sys_fstat(_fd: usize, _st: *mut Stat) -> isize {
+pub fn sys_fstat(fd: usize, st: *mut Stat) -> isize {
     trace!(
-        "kernel:pid[{}] sys_fstat NOT IMPLEMENTED",
+        "kernel:pid[{}] sys_fstat",
         current_task().unwrap().pid.0
     );
-    -1
+    let task = current_task().expect("sys_fstat: no current task");
+    let inner = task.inner_exclusive_access();
+    let Some(file) = inner.fd_table[fd].clone() else {
+        return -1;
+    };
+    drop(inner);
+    let stat = file.stat();
+    let stat_ptr: *const u8 = unsafe { core::mem::transmute(&stat) };
+    let st_ptr: *const u8 = unsafe { core::mem::transmute(st) };
+    let len = core::mem::size_of::<Stat>();
+    let frames = translated_byte_buffer(current_user_token(), st_ptr, len);
+    let mut offset = 0;
+    for frame in frames {
+        frame.copy_from_slice(unsafe {
+            core::slice::from_raw_parts(stat_ptr.add(offset), frame.len())
+        });
+        offset += frame.len();
+    }
+    0
 }
 
 /// YOUR JOB: Implement linkat.
